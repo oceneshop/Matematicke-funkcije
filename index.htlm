@@ -1,0 +1,301 @@
+
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulator funkcija</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/14.8.1/math.js"></script>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0b1020;
+  --panel: #151d32;
+  --border: #293650;
+  --accent: #7c83ff;
+  --text: #f1f5ff;
+  --muted: #a8b3ca;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 24px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, sans-serif;
+}
+main { max-width: 850px; margin: auto; }
+header { text-align: center; margin: 12px 0 28px; }
+h1 { margin-bottom: 8px; }
+header p, .muted { color: var(--muted); }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+.inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+label { display: block; font-weight: bold; margin-bottom: 8px; }
+input, select {
+  width: 100%;
+  background: #0b1020;
+  border: 1px solid var(--border);
+  color: white;
+  border-radius: 9px;
+  padding: 12px;
+  font-size: 16px;
+}
+button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 9px;
+  padding: 12px 16px;
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.12); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.actions button.secondary { background: #293650; }
+.result {
+  background: #0b1020;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.answer { color: #a7f3d0; font-size: 19px; font-weight: bold; }
+.error { color: #fda4af; }
+h2 { font-size: 19px; }
+code { color: #c4b5fd; }
+li { margin: 9px 0; }
+footer { text-align: center; color: var(--muted); padding: 16px; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>🧮 Kalkulator funkcija</h1>
+  <p>Izračunaj f(x), kompozicije i inverzne funkcije.</p>
+</header>
+
+<section class="panel">
+  <h2>1. Unesi funkcije</h2>
+  <p class="muted">Primeri: 2*x+3, x^2+1, 3*x-4, 1/x</p>
+  <div class="inputs">
+    <div>
+      <label for="f">Funkcija f(x)</label>
+      <input id="f" value="2*x+3" autocomplete="off">
+    </div>
+    <div>
+      <label for="g">Funkcija g(x)</label>
+      <input id="g" value="x^2-1" autocomplete="off">
+    </div>
+    <div>
+      <label for="x">Vrednost x</label>
+      <input id="x" type="number" value="2" step="any">
+    </div>
+  </div>
+  <div class="actions">
+    <button onclick="calculate()">Izračunaj</button>
+    <button class="secondary" onclick="randomExample()">Novi primer</button>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>2. Izaberi šta računaš</h2>
+  <div class="inputs">
+    <div>
+      <label for="operation">Operacija</label>
+      <select id="operation">
+        <option value="fx">f(x)</option>
+        <option value="gx">g(x)</option>
+        <option value="gf">g ∘ f = g(f(x))</option>
+        <option value="fg">f ∘ g = f(g(x))</option>
+        <option value="fi">Inverzna funkcija f⁻¹(x)</option>
+        <option value="gi">Inverzna funkcija g⁻¹(x)</option>
+      </select>
+    </div>
+  </div>
+  <div id="result" class="result" aria-live="polite">
+    Izaberi operaciju i pritisni „Izračunaj”.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>3. Primeri za vežbanje</h2>
+  <p class="muted">Klikni na primer da popuniš funkcije i automatski izabereš operaciju.</p>
+  <div class="actions">
+    <button class="secondary" onclick="loadExample('2*x+1','3*x-2','gf')">
+      g ∘ f
+    </button>
+    <button class="secondary" onclick="loadExample('x+4','2*x-3','fg')">
+      f ∘ g
+    </button>
+    <button class="secondary" onclick="loadExample('3*x+6','2*x-4','fi')">
+      f⁻¹(x)
+    </button>
+    <button class="secondary" onclick="loadExample('x^2+1','x-2','fx')">
+      f(x)
+    </button>
+  </div>
+  <div id="example" class="result">
+    <strong>Primer:</strong><br>
+    f(x) = 2x + 1<br>
+    g(x) = 3x − 2<br>
+    <span class="muted">Za g ∘ f prvo izračunaj f(x), pa dobijeni izraz ubaci u g.</span>
+  </div>
+</section>
+
+<footer>Kalkulator funkcija • Matematika</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function parseFunction(text) {
+  if (!text.trim()) throw Error("Unesi funkciju.");
+  const node = math.parse(text);
+  const symbols = [];
+  node.traverse(n => {
+    if (n.isSymbolNode && !["x", "e", "pi"].includes(n.name))
+      symbols.push(n.name);
+  });
+  if (symbols.length)
+    throw Error("Koristi samo promenljivu x i matematičke funkcije.");
+  return node;
+}
+
+function evaluateAt(node, x) {
+  const value = node.evaluate({x});
+  if (typeof value !== "number" || !Number.isFinite(value))
+    throw Error("Rezultat nije realan broj za zadato x.");
+  return value;
+}
+
+function formatNumber(n) {
+  return Number(n.toPrecision(10)).toString();
+}
+
+function compose(outer, inner) {
+  return outer.transform(node => {
+    if (node.isSymbolNode && node.name === "x")
+      return inner.clone();
+    return node;
+  });
+}
+
+function inverseLinear(node) {
+  // Inverzna funkcija se ovde računa samo za linearne funkcije ax+b.
+  // Vrednosti u 0, 1 i 2 proveravaju da li je izraz linearan.
+  const b = evaluateAt(node, 0);
+  const at1 = evaluateAt(node, 1);
+  const at2 = evaluateAt(node, 2);
+  const a = at1 - b;
+
+  if (Math.abs(a) < 1e-10)
+    throw Error("Konstantna funkcija nema inverznu funkciju.");
+
+  if (Math.abs(at2 - (2*a+b)) > 1e-8)
+    throw Error("Automatsko nalaženje inverzne funkcije trenutno radi za linearne funkcije ax+b.");
+
+  return math.parse(`(x-(${b}))/(${a})`);
+}
+
+function calculate() {
+  const output = $("result");
+  try {
+    const f = parseFunction($("f").value);
+    const g = parseFunction($("g").value);
+    const x = Number($("x").value);
+    if ($("x").value.trim() === "" || !Number.isFinite(x))
+      throw Error("Unesi ispravnu brojčanu vrednost za x.");
+
+    const op = $("operation").value;
+    let expression, explanation, value;
+
+    if (op === "fx" || op === "gx") {
+      const node = op === "fx" ? f : g;
+      const name = op === "fx" ? "f" : "g";
+      expression = `${name}(${x}) = ${node.toString()}`;
+      value = evaluateAt(node, x);
+      explanation = `U izraz ${node.toString()} umesto x uvrsti ${x}.`;
+    } else if (op === "gf" || op === "fg") {
+      const outer = op === "gf" ? g : f;
+      const inner = op === "gf" ? f : g;
+      const name = op === "gf" ? "g(f(x))" : "f(g(x))";
+      const innerName = op === "gf" ? "f(x)" : "g(x)";
+      const innerValue = evaluateAt(inner, x);
+      const combined = compose(outer, inner);
+      value = evaluateAt(combined, x);
+      expression = `${name} = ${combined.toString()}`;
+      explanation =
+        `1. Prvo izračunaj ${innerName}: ${formatNumber(innerValue)}.<br>` +
+        `2. Zatim dobijenu vrednost uvrsti u spoljašnju funkciju.<br>` +
+        `3. Složena funkcija je ${combined.toString()}.`;
+    } else {
+      const node = inverseLinear(op === "fi" ? f : g);
+      const name = op === "fi" ? "f⁻¹" : "g⁻¹";
+      value = evaluateAt(node, x);
+      expression = `${name}(x) = ${node.toString()}`;
+      explanation =
+        `Za linearnu funkciju y = ax + b zameni x i y, ` +
+        `a zatim izrazi y. Inverzna funkcija je ${node.toString()}.`;
+    }
+
+    output.innerHTML =
+      `<div class="answer">Rezultat: ${formatNumber(value)}</div>` +
+      `<p><strong>Izraz:</strong> <code>${escapeHTML(expression)}</code></p>` +
+      `<p><strong>Postupak:</strong> ${escapeHTML(explanation)
+        .replaceAll("&lt;br&gt;", "<br>")}</p>`;
+  } catch (error) {
+    output.innerHTML = `<p class="error"><strong>Greška:</strong> ${
+      escapeHTML(error.message)
+    }</p>`;
+  }
+}
+
+function escapeHTML(text) {
+  return String(text).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function loadExample(f, g, op) {
+  $("f").value = f;
+  $("g").value = g;
+  $("operation").value = op;
+  $("x").value = 2;
+  calculate();
+  $("example").innerHTML =
+    `<strong>Izabrani primer:</strong><br>` +
+    `f(x) = ${escapeHTML(f)}<br>` +
+    `g(x) = ${escapeHTML(g)}<br>` +
+    `<span class="muted">x = 2. Pogledaj postupak iznad.</span>`;
+}
+
+const examples = [
+  ["2*x+1", "3*x-2", "gf"],
+  ["x+4", "2*x-3", "fg"],
+  ["3*x+6", "2*x-4", "fi"],
+  ["x^2+1", "x-2", "fx"],
+  ["4*x-5", "x+7", "gi"]
+];
+
+function randomExample() {
+  const item = examples[Math.floor(Math.random() * examples.length)];
+  loadExample(...item);
+}
+
+$("operation").addEventListener("change", calculate);
+</script>
+</body>
+</html>
